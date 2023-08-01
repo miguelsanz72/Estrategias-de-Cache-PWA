@@ -18,33 +18,26 @@ self.addEventListener('install', (e) => {
 });
 
 self.addEventListener("fetch", (e) => {
-  if (e.request.url.includes("wp-admin")) return;
+  if (e.request.url.includes("wp-admin") || e.request.method === 'POST') return;
 
   e.respondWith(
-    fetch(e.request)
-      .then(newResp => {
-        // If successful fetch, update cache and return response
-        const cloneResp = newResp.clone();
-        
-        if (e.request.method !== 'POST') {
-          caches.open(CACHE_STATIC_NAME).then(cache => cache.put(e.request, cloneResp));
-          cleanCache(CACHE_STATIC_NAME, 500);
-        } else {
-          caches.open(CACHE_DINAMIC_NAME).then(cache => cache.put(e.request, cloneResp));
-          cleanCache(CACHE_DINAMIC_NAME, 500);
-        }
-        
-        return newResp;
+    caches.match(e.request)
+      .then(cachedResp => {
+        const networkFetch = fetch(e.request)
+          .then(networkResp => {
+            if (e.request.method !== 'POST') {
+              caches.open(CACHE_STATIC_NAME).then(cache => cache.put(e.request, networkResp.clone()));
+              cleanCache(CACHE_STATIC_NAME, 500);
+            }
+            return networkResp;
+          });
+
+        return cachedResp || networkFetch;
       })
       .catch(() => {
-        // If fetch fails, return cached response
-        return caches.match(e.request).then(resp => {
-          if (resp) {
-            return resp;
-          } else if (e.request.headers.get("accept").includes("text/html")) {
-            return caches.match("/pages/offline.html");
-          }
-        });
+        if (e.request.headers.get("accept").includes("text/html")) {
+          return caches.match("/pages/offline.html");
+        }
       })
   );
 });
