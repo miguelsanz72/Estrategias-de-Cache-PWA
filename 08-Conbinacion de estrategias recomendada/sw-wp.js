@@ -20,11 +20,10 @@ self.addEventListener('install', (e) => {
 self.addEventListener("fetch", (e) => {
   if (e.request.url.includes("wp-admin")) return;
 
-  const response = caches.match(e.request)
-    .then(resp => {
-      if (resp) return resp;
-
-      return fetch(e.request).then(newResp => {
+  e.respondWith(
+    fetch(e.request)
+      .then(newResp => {
+        // If successful fetch, update cache and return response
         const cloneResp = newResp.clone();
         
         if (e.request.method !== 'POST') {
@@ -36,15 +35,18 @@ self.addEventListener("fetch", (e) => {
         }
         
         return newResp;
-      });
-    })
-    .catch(() => {
-      if (e.request.headers.get("accept").includes("text/html")) {
-        return caches.match("/pages/offline.html");
-      }
-    });
-
-  e.respondWith(response);
+      })
+      .catch(() => {
+        // If fetch fails, return cached response
+        return caches.match(e.request).then(resp => {
+          if (resp) {
+            return resp;
+          } else if (e.request.headers.get("accept").includes("text/html")) {
+            return caches.match("/pages/offline.html");
+          }
+        });
+      })
+  );
 });
 
 self.addEventListener("activate", (e) => {
