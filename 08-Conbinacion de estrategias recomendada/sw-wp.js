@@ -17,6 +17,7 @@ async function cleanCache(cacheName, maxItems) {
     }
   });
 }
+
 // prettier-ignore
 self.addEventListener('install', (e) => {
     const cacheprom = caches
@@ -41,7 +42,7 @@ self.addEventListener("fetch", (e) => {
     .then((resp) => {
       // En cada recarga va a la web y actualiza el STATIC CACHE
       caches.open(CACHE_STATIC_NAME).then((cache) => {
-        fetch(e.request).then((newresp) => cache.put(e.request, newresp));
+        fetch(e.request).then((newresp) => cache.put(e.request.clone(), newresp.clone()));
         cleanCache(CACHE_STATIC_NAME, 500);
       });
 
@@ -51,22 +52,31 @@ self.addEventListener("fetch", (e) => {
       if (resp) return resp;
 
       return fetch(e.request).then((newResp) => {
-        caches.open(CACHE_DINAMIC_NAME).then((cache) => {
-          cache.put(e.request, newResp);
+        
+          if (e.request.method !== 'POST') {
+              caches.open(CACHE_DINAMIC_NAME).then((cache) => {
+                  cache.put(e.request.clone(), newResp.clone());
+                  cleanCache(CACHE_DINAMIC_NAME, 500);
+              });
+          }
+
+          cache.put(e.request.clone(), newResp.clone());
           cleanCache(CACHE_DINAMIC_NAME, 500);
-        });
+      });
 
         return newResp.clone();
-      });
-    })
-    .catch(() => {
+    });
+
+    e.respondWith(response);
+    
+})
+.catch(() => {
       if (e.request.headers.get("accept").includes("text/html")) {
         return caches.match("/pages/offline.html");
       }
-    });
-
-  e.respondWith(response);
 });
+
+
 
 // cunado se activa el Sw
 
